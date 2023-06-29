@@ -22,6 +22,7 @@ class GIImage(object):
         self.ph = float(numbers[3])
         # data: 2D array
         self.data = plt.imread(fpath)
+        self.labels = None
         if label_df is not None:
             self.labels = self.get_labels(label_df)
     
@@ -53,3 +54,12 @@ class GIImage(object):
     
     def print_image_info(self) -> None:
         print(f"Image ID: {self.id}; slice width/height = ({self.sw}, {self.sh}); data shape = {self.data.shape}")
+        
+    def show_image(self) -> None:
+        _, axs = plt.subplots(ncols=len(self.organs), squeeze=False, figsize=(15, 5))
+
+        for i, organ in enumerate(GIImage.organs):
+            axs[0, i].imshow(self.data, cmap="gray")
+            if self.labels:
+                axs[0, i].imshow(self.labels[organ], cmap="gray", alpha=0.4)
+            axs[0, i].set_title(organ)
