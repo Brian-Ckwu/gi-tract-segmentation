@@ -35,7 +35,7 @@ class GIImage(object):
 
     # converting run-length encoding to pixel-wise labels
     def seg_to_label(self, seg: str):
-        label = np.zeros(shape=(self.sw, self.sh))
+        label = np.zeros(shape=(self.sh, self.sw))
         if type(seg) == str:
             numbers = seg.split(' ')
             assert len(numbers) % 2 == 0
