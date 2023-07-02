@@ -1,4 +1,5 @@
 import math
+import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -25,6 +26,10 @@ class GIImage(object):
         self.labels = None
         if label_df is not None:
             self.labels = self.get_labels(label_df)
+    
+    @property
+    def tensor(self):
+        return torch.from_numpy(self.data)
     
     def get_labels(self, label_df: pd.DataFrame) -> dict:
         labels = label_df.loc[label_df.id == self.id]
