@@ -4,6 +4,7 @@ from argparse import Namespace
 import random
 import numpy as np
 import torch
+import torch.nn as nn
 
 def load_yaml(file: str) -> Namespace:
     with open(file) as f:
@@ -17,3 +18,7 @@ def set_seed(seed: int):
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
+
+def get_output_shape(model: nn.Module, input_shape: tuple):
+    t = torch.rand(input_shape)
+    return model(t).shape
