@@ -2,11 +2,14 @@ import os
 import math
 import random
 import torch
+import torch.nn as nn
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import torchvision.transforms.functional as TF
 from pathlib import Path
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+from utils import get_output_shape
 
 class GIImage(object):
     organs = ["stomach", "small_bowel", "large_bowel"]
@@ -31,8 +34,15 @@ class GIImage(object):
             self.labels = self.get_labels(label_df)
     
     @property
-    def tensor(self):
+    def tensor(self) -> torch.Tensor:
         return torch.from_numpy(self.data)
+    
+    @property
+    def label_tensors(self) -> dict:
+        if self.labels:
+            return {organ: torch.from_numpy(label) for organ, label in self.labels.items()}
+        else:
+            return None
     
     def get_labels(self, label_df: pd.DataFrame) -> dict:
         labels = label_df.loc[label_df.id == self.id]
@@ -72,7 +82,7 @@ class GIImage(object):
                 axs[0, i].imshow(self.labels[organ], cmap="gray", alpha=0.4)
             axs[0, i].set_title(organ)
 
-class GITractDataset(Dataset):
+class GIImageDataset(Dataset):
     
     def __init__(
         self,
@@ -121,3 +131,45 @@ def train_valid_split_cases(image_path: str, valid_size: float = 0.2) -> set:
     train_cases = set(cases) - valid_cases
     assert ((valid_cases & train_cases) == set()) and ((valid_cases | train_cases) == set(cases))
     return train_cases, valid_cases
+
+class GIImageDataLoader(object):
+    
+    def __init__(
+        self,
+        model: nn.Module,
+        dataset: GIImageDataset,
+        batch_size: int,
+        shuffle: bool = True,
+        input_resolution: int = 572,
+        padding_mode: str = "reflect"
+    ):
+        self._model = model
+        self._dataset = dataset
+        self._batch_size = batch_size
+        self._shuffle = shuffle
+        self._input_resolution = input_resolution
+        self._output_resolution = get_output_shape(model, input_shape=(1, 1, input_resolution, input_resolution))[-1]
+        self._padding_mode = padding_mode
+
+    def collate_fn(self, images: list[GIImage]):
+        inputs = list()
+        labels = list()
+        for image in images:
+            padding = ((self._input_resolution - image.sw) // 2, (self._input_resolution - image.sh) // 2)
+            inputs.append(TF.pad(image.tensor, padding=padding, padding_mode=self._padding_mode).unsqueeze(0))
+            organs = list()
+            for organ in GIImage.organs:
+                organ_label = image.label_tensors[organ]
+                organ_label = TF.pad(organ_label, padding=padding, padding_mode=self._padding_mode)
+                organ_label = TF.center_crop(organ_label, output_size=self._output_resolution)
+                organs.append(organ_label)
+            labels.append(torch.stack(organs))
+        return torch.stack(inputs), torch.stack(labels)
+    
+    def get_data_loader(self) -> DataLoader:
+        return DataLoader(
+            dataset=self._dataset,
+            batch_size=self._batch_size,
+            shuffle=self._shuffle,
+            collate_fn=self.collate_fn
+        )
