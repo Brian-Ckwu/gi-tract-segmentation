@@ -22,3 +22,7 @@ def set_seed(seed: int):
 def get_output_shape(model: nn.Module, input_shape: tuple):
     t = torch.rand(input_shape)
     return model(t).shape
+
+def filename_to_width_height(filename: str) -> tuple:
+    splitted = filename.split('_')
+    return int(splitted[2]), int(splitted[3])
