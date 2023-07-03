@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import torchvision.transforms.functional as TF
+from matplotlib.figure import Figure
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
 from utils import get_output_shape
@@ -40,7 +41,7 @@ class GIImage(object):
     @property
     def label_tensors(self) -> dict:
         if self.labels:
-            return {organ: torch.from_numpy(label) for organ, label in self.labels.items()}
+            return {organ: torch.from_numpy(self.labels[organ]) for organ in self.organs}
         else:
             return None
     
@@ -72,15 +73,18 @@ class GIImage(object):
     
     def print_image_info(self) -> None:
         print(f"Image ID: {self.id}; slice width/height = ({self.sw}, {self.sh}); data shape = {self.data.shape}")
-        
-    def show_image(self) -> None:
-        _, axs = plt.subplots(ncols=len(self.organs), squeeze=False, figsize=(15, 5))
 
-        for i, organ in enumerate(GIImage.organs):
+    def show_segmented_images(self, segmentations: dict[str, np.ndarray] = None) -> Figure:
+        if segmentations is None:
+            segmentations = self.labels
+        
+        fig, axs = plt.subplots(ncols=len(self.organs), squeeze=False, figsize=(15, 5))
+        for i, organ in enumerate(self.organs):
             axs[0, i].imshow(self.data, cmap="gray")
             if self.labels:
-                axs[0, i].imshow(self.labels[organ], cmap="gray", alpha=0.4)
+                axs[0, i].imshow(segmentations[organ], cmap="gray", alpha=0.4)
             axs[0, i].set_title(organ)
+        return fig
 
 class GIImageDataset(Dataset):
     
@@ -171,5 +175,6 @@ class GIImageDataLoader(object):
             dataset=self._dataset,
             batch_size=self._batch_size,
             shuffle=self._shuffle,
-            collate_fn=self.collate_fn
+            collate_fn=self.collate_fn,
+            pin_memory=True
         )
