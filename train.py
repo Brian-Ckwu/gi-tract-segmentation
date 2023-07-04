@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import torch
@@ -50,6 +51,7 @@ def train(config: Namespace):
 
     best_valid_loss = evaluate(model, valid_loader, criterion, config.device, config.use_fp16) # TODO: track model performance with other metrics
     valid_losses = [best_valid_loss]
+    (exp_path / "valid_losses.json").write_text(json.dumps(valid_losses, indent=4))
     for epoch in range(config.nepochs):
         model.train()
         pbar = tqdm(train_loader)
@@ -77,7 +79,7 @@ def train(config: Namespace):
                 if total_valid_loss < best_valid_loss:
                     best_valid_loss = total_valid_loss
                     torch.save(model.state_dict(), exp_path / "model.pth")
-                    (exp_path / "valid_losses.json").write_text(valid_losses)
+                    (exp_path / "valid_losses.json").write_text(json.dumps(valid_losses, indent=4))
                     print(f"Model saved at {config.save_path}")
 
 if __name__ == "__main__":
