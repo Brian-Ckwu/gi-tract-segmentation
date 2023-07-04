@@ -5,7 +5,7 @@ from tqdm import tqdm
 from data import GIImageDataLoader
 
 # TODO: other metrics
-def evaluate(model: nn.Module, data_loader: GIImageDataLoader, criterion: nn.Module, device: str) -> float:
+def evaluate(model: nn.Module, data_loader: GIImageDataLoader, criterion: nn.Module, device: str, use_fp16: bool) -> float:
     model.eval()
     model = model.to(device)
     criterion = criterion.to(device)
@@ -14,7 +14,8 @@ def evaluate(model: nn.Module, data_loader: GIImageDataLoader, criterion: nn.Mod
         for inputs, labels in tqdm(data_loader):
             inputs = inputs.to(device)
             labels = labels.to(device)
-            preds = model(inputs)
-            loss = criterion(preds, labels)
+            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=use_fp16):
+                preds = model(inputs)
+                loss = criterion(preds, labels)
             total_loss += loss.item() * inputs.size(0)
     return total_loss

@@ -42,12 +42,13 @@ def train(config: Namespace):
     ).get_data_loader()
     
     # TODO: use other loss functions and optimizer
+    scaler = torch.cuda.amp.GradScaler(enabled=config.use_fp16)
     criterion = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=config.lr)
     
     model = model.to(config.device)
 
-    best_valid_loss = evaluate(model, valid_loader, criterion, config.device) # TODO: track model performance with other metrics
+    best_valid_loss = evaluate(model, valid_loader, criterion, config.device, config.use_fp16) # TODO: track model performance with other metrics
     valid_losses = [best_valid_loss]
     for epoch in range(config.nepochs):
         model.train()
@@ -57,17 +58,19 @@ def train(config: Namespace):
             inputs = inputs.to(config.device)
             labels = labels.to(config.device)
             
-            preds = model(inputs)
-            loss = criterion(preds, labels)
+            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=config.use_fp16):
+                preds = model(inputs)
+                loss = criterion(preds, labels)
             
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad(set_to_none=True)
 
             pbar.update()
             
             if (i != 0 and i % config.valid_steps == 0) or (i == len(train_loader) - 1):
-                total_valid_loss = evaluate(model, valid_loader, criterion, config.device)
+                total_valid_loss = evaluate(model, valid_loader, criterion, config.device, config.use_fp16)
                 valid_losses.append(total_valid_loss)
                 print(f"Valid loss: {total_valid_loss:.4f}")
                 # save model if validation loss is improved
