@@ -12,6 +12,9 @@ from model import UNet
 from evaluation import evaluate
 
 def train(config: Namespace):
+    exp_path = Path(config.save_path) / config.exp_name
+    exp_path.mkdir(parents=True, exist_ok=True)
+
     set_seed(config.seed)
     
     model = UNet(n_classes=len(GIImage.organs))
@@ -44,7 +47,8 @@ def train(config: Namespace):
     
     model = model.to(config.device)
 
-    best_valid_loss = float("inf") # TODO: track model performance with other metrics
+    best_valid_loss = evaluate(model, valid_loader, criterion, config.device) # TODO: track model performance with other metrics
+    valid_losses = [best_valid_loss]
     for epoch in range(config.nepochs):
         model.train()
         pbar = tqdm(train_loader)
@@ -62,14 +66,15 @@ def train(config: Namespace):
 
             pbar.update()
             
-            if (i % config.valid_steps == 0) or (i == len(train_loader) - 1):
+            if (i != 0 and i % config.valid_steps == 0) or (i == len(train_loader) - 1):
                 total_valid_loss = evaluate(model, valid_loader, criterion, config.device)
+                valid_losses.append(total_valid_loss)
                 print(f"Valid loss: {total_valid_loss:.4f}")
                 # save model if validation loss is improved
                 if total_valid_loss < best_valid_loss:
                     best_valid_loss = total_valid_loss
-                    torch.save(model.state_dict(), Path(config.save_path) / "model.pth")
-                    (Path(config.save_path) / "valid_loss.txt").write_text(f"{total_valid_loss:.4f}")
+                    torch.save(model.state_dict(), exp_path / "model.pth")
+                    (exp_path / "valid_losses.json").write_text(valid_losses)
                     print(f"Model saved at {config.save_path}")
 
 if __name__ == "__main__":
